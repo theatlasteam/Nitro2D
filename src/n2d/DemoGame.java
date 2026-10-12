@@ -22,6 +22,7 @@ public final class DemoGame extends Game {
     private static final int TAG_HERO = 1;
     private static final int TAG_GROUND = 2;
     private static final int TAG_CRATE = 3;
+    private static final int TAG_DYN = 4;
     private static final int TAG_COIN = 100;
 
     private Atlas atlas;
@@ -51,6 +52,7 @@ public final class DemoGame extends Game {
     private int[] coinY;
     private boolean[] coinGone;
     private int[] crateX;
+    private Body[] dynBodies = new Body[6];
 
     private String hudLeft = "";
     private String hudRight = "";
@@ -65,10 +67,11 @@ public final class DemoGame extends Game {
     private final class HeroHandler implements Body.Handler {
         public void collided(Body self, Body other, int nx, int ny) {
             if (other.tag == TAG_CRATE) {
-                deadPending = true;
+                // Crates are platforms from above, lethal from the side.
+                if (nx != 0) deadPending = true;
                 return;
             }
-            if (other.tag == TAG_GROUND && ny == -1 && self.impact > 450) {
+            if (other.tag == TAG_GROUND && ny == -1 && self.impact > 650) {
                 int fx = self.x / 1000;
                 int fy = (self.y + self.hh * 1000) / 1000;
                 for (int i = 0; i < 4; i++) {
@@ -128,6 +131,18 @@ public final class DemoGame extends Game {
                 c.statik = true;
                 c.tag = TAG_CRATE;
                 world.add(c);
+            }
+
+            // Smashable pyramid of live dynamic boxes in the runner's path.
+            int[][] pyr = {{1750, 0}, {1774, 0}, {1798, 0}, {1762, 1}, {1786, 1}, {1774, 2}};
+            for (int i = 0; i < pyr.length; i++) {
+                Body b = new Body(pyr[i][0] * 1000,
+                        (SURFACE_Y - 12 - pyr[i][1] * 24) * 1000, 12, 12);
+                b.friction = 700;
+                b.rest = 50;
+                b.tag = TAG_DYN;
+                world.add(b);
+                dynBodies[i] = b;
             }
 
             int arcs = 12;
@@ -253,6 +268,13 @@ public final class DemoGame extends Game {
             int sx = crateX[i] - cx;
             if (sx < -32 || sx > SCREEN_W + 32) continue;
             atlas.draw(g, crateRegion, sx + 12, SURFACE_Y + cy);
+        }
+        for (int i = 0; i < dynBodies.length; i++) {
+            Body b = dynBodies[i];
+            if (b == null) continue;
+            int sx = b.x / 1000 - cx;
+            if (sx < -32 || sx > SCREEN_W + 32) continue;
+            atlas.draw(g, crateRegion, sx, (b.y + 12000) / 1000 + cy);
         }
         if (invulnMs <= 0 || (simMs / 90) % 2 == 0) {
             int f = hero.supported != 0 ? Anim.frameAt(simMs, 110, 4) : 1;

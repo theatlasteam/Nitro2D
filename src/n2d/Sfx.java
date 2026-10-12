@@ -18,14 +18,15 @@ public final class Sfx {
 
     private Sfx() {}
 
-    // MIDI note numbers
-    private static final int[] JUMP = {64, 5, 72, 7};
-    private static final int[] COIN = {83, 4, 88, 10};
-    private static final int[] DEATH = {67, 5, 63, 5, 58, 12};
-    private static final int[] THUD = {45, 5};
-    private static final int[] CLICK = {76, 3};
+    // MIDI note numbers (kept in low octaves: phone square waves shriek up high)
+    private static final int[] JUMP = {60, 4, 67, 7};
+    private static final int[] COIN = {71, 4, 76, 10};
+    private static final int[] DEATH = {55, 6, 51, 6, 46, 12};
+    private static final int[] THUD = {40, 4};
+    private static final int[] CLICK = {64, 3};
 
     private static Player musicPlayer;
+    private static final long[] lastSlot = new long[8];
 
     private static final class Closer implements PlayerListener {
         public void playerUpdate(Player p, String ev, Object data) {
@@ -41,9 +42,15 @@ public final class Sfx {
 
     private static final Closer CLOSER = new Closer();
 
-    /** Play a tone sequence. notes = pairs of (midiNote, duration64ths). */
-    public static void tone(int[] notes, int tempo) {
+    /** Play a tone sequence. notes = pairs of (midiNote, duration64ths).
+     * slot/gapMs throttle repeats (landing thuds, jump spam). */
+    public static void tone(int[] notes, int tempo, int vol, int slot, int gapMs) {
         if (!enabled) return;
+        if (slot >= 0 && slot < lastSlot.length) {
+            long now = System.currentTimeMillis();
+            if (now - lastSlot[slot] < gapMs) return;
+            lastSlot[slot] = now;
+        }
         try {
             byte[] seq = new byte[6 + notes.length / 2 * 3 + 4];
             int o = 0;
@@ -56,7 +63,7 @@ public final class Sfx {
             for (int i = 0; i + 1 < notes.length; i += 2) {
                 seq[o++] = (byte) notes[i];
                 seq[o++] = (byte) notes[i + 1];
-                seq[o++] = (byte) 90;
+                seq[o++] = (byte) vol;
             }
             seq[o++] = ToneControl.BLOCK_END;
             seq[o++] = 0;
@@ -70,7 +77,7 @@ public final class Sfx {
                 return;
             }
             tc.setSequence(seq);
-            setVolume(p, 80);
+            setVolume(p, vol);
             p.addPlayerListener(CLOSER);
             p.start();
         } catch (Exception e) {
@@ -78,23 +85,23 @@ public final class Sfx {
     }
 
     public static void jump() {
-        tone(JUMP, 40);
+        tone(JUMP, 40, 45, 0, 150);
     }
 
     public static void coin() {
-        tone(COIN, 36);
+        tone(COIN, 36, 45, 1, 90);
     }
 
     public static void death() {
-        tone(DEATH, 30);
+        tone(DEATH, 28, 50, 2, 0);
     }
 
     public static void thud() {
-        tone(THUD, 30);
+        tone(THUD, 30, 40, 3, 400);
     }
 
     public static void click() {
-        tone(CLICK, 40);
+        tone(CLICK, 40, 40, 4, 0);
     }
 
     /** Fire-and-forget WAV from a resource path (e.g. "/boom.wav"). */
