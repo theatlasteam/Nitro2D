@@ -16,6 +16,7 @@ public final class Particles {
     private final int[] life;
     private final int[] ttl;
     private final int[] region;
+    private final int[][] rset;
     private final int capacity;
     private int cursor;
     public int gravity;
@@ -29,6 +30,7 @@ public final class Particles {
         life = new int[this.capacity];
         ttl = new int[this.capacity];
         region = new int[this.capacity];
+        rset = new int[this.capacity][];
     }
 
     public int alive() {
@@ -39,15 +41,30 @@ public final class Particles {
 
     /** Spawn one particle. px/px integer pixels, v in px/s. */
     public void spawn(int px, int py, int vxPxS, int vyPxS, int ttlMs, int regionIdx) {
-        int i = cursor;
+        spawnInto(cursor, px, py, vxPxS, vyPxS, ttlMs);
+        region[cursor] = regionIdx;
+        rset[cursor] = null;
         cursor = (cursor + 1) % capacity;
+    }
+
+    /**
+     * Spawn with a shrink/fade frame set (index 0 = young/big). The array
+     * is referenced, not copied: keep one static set per color, no garbage.
+     */
+    public void spawnAnim(int px, int py, int vxPxS, int vyPxS, int ttlMs, int[] frames) {
+        spawnInto(cursor, px, py, vxPxS, vyPxS, ttlMs);
+        region[cursor] = frames.length > 0 ? frames[0] : 0;
+        rset[cursor] = frames;
+        cursor = (cursor + 1) % capacity;
+    }
+
+    private void spawnInto(int i, int px, int py, int vxPxS, int vyPxS, int ttlMs) {
         x[i] = px << 16;
         y[i] = py << 16;
         vx[i] = vxPxS << 16;
         vy[i] = vyPxS << 16;
         life[i] = ttlMs;
         ttl[i] = ttlMs <= 0 ? 1 : ttlMs;
-        region[i] = regionIdx;
     }
 
     /** Burst of n particles with fixed-point spread. gravity applies. */
@@ -58,6 +75,17 @@ public final class Particles {
             int vxS = Fx.toInt(Fx.mul(Fx.fromInt(sp), Fx.cos(ang)));
             int vyS = Fx.toInt(Fx.mul(Fx.fromInt(sp), Fx.sin(ang)));
             spawn(px, py, vxS, vyS, ttlMs, regionIdx);
+        }
+    }
+
+    /** Same burst with a shrink/fade frame set. */
+    public void burstAnim(int px, int py, int n, int speedPxS, int ttlMs, int[] frames, long seed) {
+        for (int k = 0; k < n; k++) {
+            int ang = (int) ((seed * 37 + k * (360 / (n == 0 ? 1 : n))) % 360);
+            int sp = (speedPxS * (60 + (int) ((seed + k * 53) % 40))) / 100;
+            int vxS = Fx.toInt(Fx.mul(Fx.fromInt(sp), Fx.cos(ang)));
+            int vyS = Fx.toInt(Fx.mul(Fx.fromInt(sp), Fx.sin(ang)));
+            spawnAnim(px, py, vxS, vyS, ttlMs, frames);
         }
     }
 
@@ -85,8 +113,18 @@ public final class Particles {
         int drawn = 0;
         for (int i = 0; i < capacity && drawn < cap; i++) {
             if (life[i] <= 0) continue;
-            atlas.draw(g, region[i], (x[i] >> 16) - camX, (y[i] >> 16) - camY);
+            atlas.draw(g, frameOf(i), (x[i] >> 16) - camX, (y[i] >> 16) - camY);
             drawn++;
         }
+    }
+
+    /** Current region for slot i, shrinking through its frame set with age. */
+    private int frameOf(int i) {
+        int[] set = rset[i];
+        if (set == null || set.length < 2) return region[i];
+        int st = set.length - 1 - life[i] * (set.length - 1) / ttl[i];
+        if (st < 0) st = 0;
+        if (st > set.length - 1) st = set.length - 1;
+        return set[st];
     }
 }
