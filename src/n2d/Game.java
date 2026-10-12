@@ -34,6 +34,7 @@ public abstract class Game extends GameCanvas implements Runnable {
 
     protected Game() {
         super(true);
+        setFullScreenMode(true);
     }
 
     public void start() {
