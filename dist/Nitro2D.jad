@@ -1,0 +1,8 @@
+MIDlet-Name: Nitro2D
+MIDlet-Version: 0.1.0
+MIDlet-Vendor: Atlas
+MIDlet-1: Nitro2D,/icon.png,n2d.Demo
+MicroEdition-Configuration: CLDC-1.1
+MicroEdition-Profile: MIDP-2.0
+MIDlet-Jar-URL: Nitro2D.jar
+MIDlet-Jar-Size: 135654
